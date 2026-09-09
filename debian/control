@@ -10,11 +10,13 @@ Build-Depends: debhelper-compat (= 13),
                dh-exec,
                pandoc,
 
-Package: qualcomm-iqfiles
+Package: qualcomm-iqfiles-qcs9075
 Architecture: all
 Section: admin
 Priority: optional
-Depends: ${misc:Depends},
-Description: qualcomm-iqfiles
- This package provides the qualcomm-iqfiles.
-
+Depends: qcom-chicdk-qcs9100,
+         ${misc:Depends},
+Description: tuned Qualcomm QCS9075 camera IQ files
+ This package provides tuned Qualcomm camera IQ data for the QCS9075
+ IMX577 camera. The tuned file is activated through a reversible dpkg
+ diversion so the vendor camera package remains upgradeable.
