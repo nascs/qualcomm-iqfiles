@@ -1,0 +1,70 @@
+#!/bin/sh
+set -e
+
+package=$DPKG_MAINTSCRIPT_PACKAGE
+payload_dir=/usr/share/$package
+state_dir=/var/lib/qualcomm-iqfiles
+state_file=$state_dir/$package.paths
+
+find_runtime() {
+	name=$1
+	found=
+
+	for candidate in /usr/lib/*/camera/"$name"; do
+		if [ -f "$candidate" ]; then
+			if [ -n "$found" ]; then
+				echo "error: multiple runtime files found for $name" >&2
+				return 1
+			fi
+			found=$candidate
+		fi
+	done
+
+	if [ -z "$found" ]; then
+		echo "error: no vendor runtime file found for $name" >&2
+		return 1
+	fi
+
+	printf '%s\n' "$found"
+}
+
+runtime_for() {
+	name=$1
+	runtime=
+
+	if [ -f "$state_file" ]; then
+		runtime=$(grep -F -m1 "$name|" "$state_file" | cut -d '|' -f 2 || true)
+	fi
+
+	if [ -z "$runtime" ]; then
+		runtime=$(find_runtime "$name")
+	fi
+
+	printf '%s\n' "$runtime"
+}
+
+case "$1" in
+configure)
+	install -d -m 0755 "$state_dir"
+	touch "$state_file"
+
+	for payload in "$payload_dir"/*.bin; do
+		[ -f "$payload" ] || continue
+		name=${payload##*/}
+		runtime=$(runtime_for "$name")
+		diverted=${runtime}.${package}.distrib
+
+		if ! grep -F -q "$name|" "$state_file"; then
+			printf '%s|%s|%s\n' "$name" "$runtime" "$diverted" >>"$state_file"
+		fi
+
+		dpkg-divert --package "$package" \
+			--add --rename --divert "$diverted" "$runtime"
+		ln -sfn "$payload" "$runtime"
+	done
+	;;
+esac
+
+#DEBHELPER#
+
+exit 0

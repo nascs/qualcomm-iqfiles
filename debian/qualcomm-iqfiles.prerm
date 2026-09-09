@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+package=$DPKG_MAINTSCRIPT_PACKAGE
+payload_dir=/usr/share/$package
+state_dir=/var/lib/qualcomm-iqfiles
+state_file=$state_dir/$package.paths
+
+cleanup() {
+	[ -f "$state_file" ] || return 0
+
+	while IFS='|' read -r name runtime diverted; do
+		[ -n "$runtime" ] || continue
+
+		if [ -L "$runtime" ] && [ "$(readlink "$runtime")" = "$payload_dir/$name" ]; then
+			rm -f "$runtime"
+		fi
+
+		owner=$(dpkg-divert --listpackage "$runtime" 2>/dev/null || true)
+		if [ "$owner" = "$package" ]; then
+			dpkg-divert --package "$package" \
+				--remove --rename --divert "$diverted" "$runtime"
+		fi
+	done <"$state_file"
+
+	rm -f "$state_file"
+	rmdir "$state_dir" 2>/dev/null || true
+}
+
+case "$1" in
+remove)
+	cleanup
+	;;
+esac
+
+#DEBHELPER#
+
+exit 0
